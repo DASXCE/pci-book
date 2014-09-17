@@ -72,7 +72,7 @@
    (->> (map #(conj [%] (sim-pearson prefs person %)) (remove #{person} (keys prefs)))
         (sort-by #(second %))
         reverse
-        (take 3)
+        ;(take 3)
         ))
   ([prefs person n similarity]
    (->> (map #(conj [%] (sim-pearson prefs person %)) (remove #{person} (keys prefs)))
@@ -93,12 +93,22 @@
                                  (apply hash-map)
                                  (assoc {} %))
                            (keys (dissoc prefs person)))
-        unseen-rated (map #(map (fn [x] (hash-map (key x) (* (similarity prefs person (apply key %))
-                                                                          (val x))))
-                                 (apply val %))
-                          unseen-movies)]
-    unseen-movies))
 
+        unseen-rated (map #(conj (map (fn [x] (assoc {} (key x) (* (similarity prefs person (apply key %))
+                                                                   (val x))))
+                                      (apply val %))
+                                 (apply key %))
+                          unseen-movies)
+
+        sim-sum   (reduce +(map #(similarity prefs person (key %))
+                                others))]
+    ;unseen-rated
+    sim-sum))
+
+(map #(sim-pearson critics "Toby" ))
+
+(map #(assoc {} (key %) (sim-pearson critics "Toby" (key %))) critics)
+(reduce #(+ (apply val %1) (apply val %2)) '({:a 1} {:b 2}))
 
 (get-recommendations critics "Toby" sim-pearson)
 
