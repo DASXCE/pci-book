@@ -20,7 +20,9 @@
                                 "The Night Listener"  3.0  "Superman Returns"  5.0  "You  Me and Dupree"  3.5}
               "Toby"  {"Snakes on a Plane" 4.5 "You  Me and Dupree" 1.0 "Superman Returns" 4.0}})
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; euclidian distance score
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn sim-distance [prefs person1 person2]
   (let [prefs-p1       (prefs person1)
@@ -40,8 +42,9 @@
 
 (sim-distance critics "Lisa Rose" "Gene Seymour")
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pearson Correlation Score
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn sim-pearson [prefs person1 person2]
   (let [prefs-p1       (prefs person1)
@@ -66,25 +69,47 @@
 (sim-pearson critics "Lisa Rose" "Gene Seymour")
 
 
+;;;;;;;;;;;;;;;;;;;;;;
+;; Ranking the Critics
+;;;;;;;;;;;;;;;;;;;;;;
+
 (defn top-matches
   "return best matches for person, default number of results = 3, default similarity function = Pearson Correlation Score"
   ([prefs person]
-   (->> (map #(conj [%] (sim-pearson prefs person %)) (remove #{person} (keys prefs)))
-        (sort-by #(second %))
-        reverse
-        ;(take 3)
-        ))
+   (let [others       (dissoc prefs person)
+         sim (partial sim-pearson prefs person)
+         my-map (->> (filter #(> (sim (key %)) 0)
+                             others)
+                     keys
+                     (reduce #(assoc %1 (sim %2) %2) {})
+                     )]
+     (into (sorted-map-by (fn [key1 key2] (compare (my-map key1) (my-map key2)))) my-map)
+     ))
   ([prefs person n similarity]
    (->> (map #(conj [%] (sim-pearson prefs person %)) (remove #{person} (keys prefs)))
         (sort-by #(second %))
         reverse
         (take n))))
 
+(reduce-kv #(assoc %1 %2 %3) {} {:g {:a 1 :b 2 :c 3}
+                                 :l {:a 4 :b 5 :c 6}})
 
 (top-matches critics "Toby")
 
+(into (sorted-map-by (fn [key1 key2] (compare (key1 my-map) (key2 my-map)))) my-map)
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;
+;; Recommending Items
+;;;;;;;;;;;;;;;;;;;;;
+
 (defn get-recommendations [prefs person similarity]
-  (let [others (dissoc prefs person)
+  (let [others       (dissoc prefs person)
+        similarities (top-matches prefs person)
+
         unseen-movies (map #(->> (conj (filter (fn [c] (not (contains? (prefs person) (first c))))
                                                (prefs %))
                                        %)
@@ -92,37 +117,34 @@
                                  (reduce concat)
                                  (apply hash-map)
                                  (assoc {} %))
-                           (keys (dissoc prefs person)))
+                           (keys others))
 
-        unseen-rated (map #(conj (map (fn [x] (assoc {} (key x) (* (similarity prefs person (apply key %))
-                                                                   (val x))))
-                                      (apply val %))
-                                 (apply key %))
+        movie-keys (->> (map #(keys (apply val %)) unseen-movies)
+                        (reduce concat)
+                        (apply hash-set))
+
+        ;rankings (map #(map #(when (contains? others %)
+         ;                      (conj %))
+          ;                  (prefs %))
+           ;           (keys others))
+
+        unseen-rated (map #(let [sim (similarity prefs person (apply key %))]
+                                                (when (> sim 0 )
+                                                  (conj
+                                                   (map (fn [x] (assoc {} (key x) (* sim (val x))))
+                                                        (apply val %))
+                                                   (apply key %))))
                           unseen-movies)
 
         sim-sum   (reduce +(map #(similarity prefs person (key %))
                                 others))]
+    similarities
+    ;movie-keys
+    ;unseen-movies
     ;unseen-rated
-    sim-sum))
-
-(map #(sim-pearson critics "Toby" ))
-
-(map #(assoc {} (key %) (sim-pearson critics "Toby" (key %))) critics)
-(reduce #(+ (apply val %1) (apply val %2)) '({:a 1} {:b 2}))
+    ;sim-sum
+    ))
 
 (get-recommendations critics "Toby" sim-pearson)
 
-(def u-mm '({"Mick LaSalle" {"Just My Luck" 2.0, "Lady in the Water" 3.0, "The Night Listener" 3.0}} {"Claudia Puig" {"Just My Luck" 3.0, "The Night Listener" 4.5}} {"Lisa Rose" {"Just My Luck" 3.0, "Lady in the Water" 2.5, "The Night Listener" 3.0}} {"Jack Matthews" {"Lady in the Water" 3.0, "The Night Listener" 3.0}} {"Michael Phillips" {"Lady in the Water" 2.5, "The Night Listener" 4.0}} {"Gene Seymour" {"Just My Luck" 1.5, "Lady in the Water" 3.0, "The Night Listener" 3.0}}))
-
-(map
- #(map (fn [x] (str "::::" (key x) ":::::"))
-       (apply val %))
- u-mm)
-
-(map #(u-mm (apply key %))
-     u-mm)
-
-(u-mm {"Mick LaSalle" {}})
-
-(apply key {"Mick LaSalle" {"Just My Luck" 2.0, "Lady in the Water" 3.0, "The Night Listener" 3.0}})
-
+(get-recommendations critics "Toby" sim-pearson)
