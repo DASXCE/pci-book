@@ -81,25 +81,16 @@
          my-map (->> (filter #(> (sim (key %)) 0)
                              others)
                      keys
-                     (reduce #(assoc %1 (sim %2) %2) {})
-                     )]
-     (into (sorted-map-by (fn [key1 key2] (compare (my-map key1) (my-map key2)))) my-map)
-     ))
-  ([prefs person n similarity]
-   (->> (map #(conj [%] (sim-pearson prefs person %)) (remove #{person} (keys prefs)))
-        (sort-by #(second %))
-        reverse
-        (take n))))
-
-(reduce-kv #(assoc %1 %2 %3) {} {:g {:a 1 :b 2 :c 3}
-                                 :l {:a 4 :b 5 :c 6}})
+                     (reduce #(assoc %1 %2 (sim %2)) {}))]
+     (into (sorted-map-by (fn [key1 key2] (compare (get my-map key2) (get my-map key1)))) my-map)))
+  ;([prefs person n similarity]
+   ;(->> (map #(conj [%] (sim-pearson prefs person %)) (remove #{person} (keys prefs)))
+    ;    (sort-by #(second %))
+     ;   reverse
+      ;  (take n)))
+  )
 
 (top-matches critics "Toby")
-
-(into (sorted-map-by (fn [key1 key2] (compare (key1 my-map) (key2 my-map)))) my-map)
-
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;
@@ -123,10 +114,7 @@
                         (reduce concat)
                         (apply hash-set))
 
-        ;rankings (map #(map #(when (contains? others %)
-         ;                      (conj %))
-          ;                  (prefs %))
-           ;           (keys others))
+        rankings (reduce #(assoc %1 (key(val %2)) {%2 (val (val %2))} ) {} unseen-movies)
 
         unseen-rated (map #(let [sim (similarity prefs person (apply key %))]
                                                 (when (> sim 0 )
@@ -139,7 +127,8 @@
         sim-sum   (reduce +(map #(similarity prefs person (key %))
                                 others))]
     similarities
-    ;movie-keys
+    movie-keys
+    rankings
     ;unseen-movies
     ;unseen-rated
     ;sim-sum
@@ -148,3 +137,4 @@
 (get-recommendations critics "Toby" sim-pearson)
 
 (get-recommendations critics "Toby" sim-pearson)
+
