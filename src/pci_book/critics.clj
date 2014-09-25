@@ -3,22 +3,22 @@
             [clojure.tools.logging :as log]))
 
 (def critics {"Lisa Rose"  {"Lady in the Water"  2.5  "Snakes on a Plane"  3.5
-                            "Just My Luck"  3.0  "Superman Returns"  3.5  "You  Me and Dupree"  2.5
+                            "Just My Luck"  3.0  "Superman Returns"  3.5  "You Me and Dupree"  2.5
                             "The Night Listener"  3.0}
               "Gene Seymour"  {"Lady in the Water"  3.0  "Snakes on a Plane"  3.5
                                "Just My Luck"  1.5  "Superman Returns"  5.0  "The Night Listener"  3.0
-                               "You  Me and Dupree"  3.5}
+                               "You Me and Dupree"  3.5}
               "Michael Phillips"  {"Lady in the Water"  2.5  "Snakes on a Plane"  3.0
                                    "Superman Returns"  3.5  "The Night Listener"  4.0}
               "Claudia Puig"  {"Snakes on a Plane"  3.5  "Just My Luck"  3.0
                                "The Night Listener"  4.5  "Superman Returns"  4.0
-                               "You  Me and Dupree"  2.5}
+                               "You Me and Dupree"  2.5}
               "Mick LaSalle"  {"Lady in the Water"  3.0  "Snakes on a Plane"  4.0
                                "Just My Luck"  2.0  "Superman Returns"  3.0  "The Night Listener"  3.0
-                               "You  Me and Dupree"  2.0}
+                               "You Me and Dupree"  2.0}
               "Jack Matthews"  {"Lady in the Water"  3.0  "Snakes on a Plane"  4.0
-                                "The Night Listener"  3.0  "Superman Returns"  5.0  "You  Me and Dupree"  3.5}
-              "Toby"  {"Snakes on a Plane" 4.5 "You  Me and Dupree" 1.0 "Superman Returns" 4.0}})
+                                "The Night Listener"  3.0  "Superman Returns"  5.0  "You Me and Dupree"  3.5}
+              "Toby"  {"Snakes on a Plane" 4.5 "You Me and Dupree" 1.0 "Superman Returns" 4.0}})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; euclidian distance score
@@ -97,37 +97,47 @@
 ;; Recommending Items
 ;;;;;;;;;;;;;;;;;;;;;
 
+(defn remove-all[from in]
+  (remove (fn [[k v]] ((apply hash-set (keys from)) k)) in))
+
+(defn get-movie-critic [m c]
+  (->>(reduce #(assoc %1 (key %2) ((val %2) m))
+              {} c)
+      (remove #(nil? (val %)))
+      (reduce concat)
+      (apply hash-map)))
+
+(get-movie-critic "Just My Luck" critics)
+
 (defn get-recommendations [prefs person similarity]
   (let [others       (dissoc prefs person)
         similarities (top-matches prefs person)
 
-        unseen-movies (map #(->> (conj (filter (fn [c] (not (contains? (prefs person) (first c))))
-                                               (prefs %))
-                                       %)
-                                 rest
-                                 (reduce concat)
-                                 (apply hash-map)
-                                 (assoc {} %))
-                           (keys others))
+        unseen-movies (reduce #(->>
+                                (remove-all (prefs person) (val %2))
+                                (reduce concat)
+                                (apply hash-map)
+                                (assoc %1 (key %2)))
+                              {}
+                              others)
 
-        movie-keys (->> (map #(keys (apply val %)) unseen-movies)
-                        (reduce concat)
-                        (apply hash-set))
+        unseen-movie-names (reduce #(apply conj %1 (keys (val %2))) #{} unseen-movies)
 
-        rankings (reduce #(assoc %1 (key(val %2)) {%2 (val (val %2))} ) {} unseen-movies)
+        rankings (reduce #(assoc %1 %2 (get-movie-critic %2 others)) {} unseen-movie-names)
 
-        unseen-rated (map #(let [sim (similarity prefs person (apply key %))]
-                                                (when (> sim 0 )
-                                                  (conj
-                                                   (map (fn [x] (assoc {} (key x) (* sim (val x))))
-                                                        (apply val %))
-                                                   (apply key %))))
-                          unseen-movies)
+
+        ;unseen-rated (map #(let [sim (similarity prefs person (apply key %))]
+         ;                                       (when (> sim 0 )
+          ;                                        (conj
+           ;                                        (map (fn [x] (assoc {} (key x) (* sim (val x))))
+            ;                                            (apply val %))
+             ;                                      (apply key %))))
+              ;            unseen-movies)
 
         sim-sum   (reduce +(map #(similarity prefs person (key %))
                                 others))]
     similarities
-    movie-keys
+    ;unseen-movie-names
     rankings
     ;unseen-movies
     ;unseen-rated
@@ -137,4 +147,9 @@
 (get-recommendations critics "Toby" sim-pearson)
 
 (get-recommendations critics "Toby" sim-pearson)
+
+{"Just My Luck" {"Lisa Rose" 3.2545}}
+
+(reduce #() {} critics)
+
 
