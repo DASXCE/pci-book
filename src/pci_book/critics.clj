@@ -69,6 +69,7 @@
 (sim-pearson critics "Lisa Rose" "Gene Seymour")
 
 
+
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; Ranking the Critics
 ;;;;;;;;;;;;;;;;;;;;;;
@@ -125,26 +126,50 @@
 
         rankings (reduce #(assoc %1 %2 (get-movie-critic %2 others)) {} unseen-movie-names)
 
+        mult-rank (reduce #(assoc %1 (key %2) (reduce
+                                               (fn [x y]
+                                                 (assoc x (key y) (* (val y)
+                                                                     (similarity prefs person (key y)))))
+                                               {}
+                                                 (filter (fn [[k v]] (if (>(*(similarity prefs person k)
+                                                                             v)
+                                                                           0)
+                                                                       true))
+                                                         (val %2))))
+                          {} rankings)
 
-        ;unseen-rated (map #(let [sim (similarity prefs person (apply key %))]
-         ;                                       (when (> sim 0 )
-          ;                                        (conj
-           ;                                        (map (fn [x] (assoc {} (key x) (* sim (val x))))
-            ;                                            (apply val %))
-             ;                                      (apply key %))))
-              ;            unseen-movies)
+        totals (reduce #(assoc %1 (key %2)
+                          (->
+                           (reduce + (vals(val %2)))
+                           (/ (reduce + (->>
+                                         (filter (fn [x] (if (contains? (val %2) (key x))
+                                                                          true)
+                                                                     ) similarities)
+                                         (reduce concat)
+                                         (apply hash-map)
+                                         vals))
+                              )
+                           ))
+                       {} mult-rank)
 
         sim-sum   (reduce +(map #(similarity prefs person (key %))
                                 others))]
     similarities
     ;unseen-movie-names
     rankings
+    mult-rank
+    totals
     ;unseen-movies
     ;unseen-rated
     ;sim-sum
     ))
 
 (get-recommendations critics "Toby" sim-pearson)
+
+(vals(apply hash-map(reduce concat(filter (fn [x] (if (contains? {"Gene Seymour" 0.5718696387472675, "Lisa Rose" 2.97372212148579, "Claudia Puig" 2.680215442324694, "Mick LaSalle" 1.8489469032838097} (key x))
+                                                    true)
+                                            ) (top-matches critics "Toby")))))
+
 
 (get-recommendations critics "Toby" sim-pearson)
 
