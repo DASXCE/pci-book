@@ -8,3 +8,4 @@
              (first [1 2 3 5]) => 1)
        (fact "should fail"
              (first [1 2 3 5]) =not=> 1))
+
