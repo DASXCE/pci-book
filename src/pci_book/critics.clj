@@ -1,7 +1,8 @@
 (ns pci-book.critics
   (:require [clojure.set :as clset]
             [clojure.tools.logging :as log]
-            [clojure.walk :as walk]))
+            [clojure.walk :as walk]
+            [criterium.core :as bench]))
 
 (def critics {"Lisa Rose"  {"Lady in the Water"  2.5  "Snakes on a Plane"  3.5
                             "Just My Luck"  3.0  "Superman Returns"  3.5  "You Me and Dupree"  2.5
@@ -148,8 +149,11 @@
 
 (get-movie-critic "Just My Luck" critics)
 
+;;;;;;;;;;;;;;;;;;;;
+;; old implentation
+;;;;;;;;;;;;;;;;;;;;
 
-(defn get-recommendations [prefs person similarity]
+#_(defn get-recommendations [prefs person similarity]
   (let [others        (dissoc prefs person)
         similar       (top-matches prefs person)
         unseen-movies (reduce #(->>
@@ -187,30 +191,51 @@
                               )
                            ))
                        {} mult-rank)]
-    totals
-
-    ))
-
-(defn get-recommendations2 [prefs person similarity]
-  (for [[other crtcs] (dissoc prefs person)
-        :let [sim (similarity prefs person other)]
-        :when (> sim 0)]
-    (into {}(for [[m r] crtcs
-                  :when (not (contains? (set (keys (prefs person))) m))]
-              [m (* sim r)]))))
-
- ; (map #(instance? java.util.Map$Entry %) {:a 1})
+    totals))
 
 
- ; (assoc x (key y) (+ (val x) (val y)))
-
- (map #(reduce (fn [x y] (assoc x (key y) ""))
-               {}
-               %)
-      (get-recommendations2 critics "Toby" sim-pearson))
 
 
- (get-recommendations2 critics "Toby" sim-pearson)
 
-(get-recommendations critics "Toby" sim-pearson)
+(defn get-unseen-movies
+  "Gets unseen movies for person. Returns ({\"Movie\" {:sim similarity :rating (* rating similarity)}, ..."
+  [prefs person similarity]
+  (->> (for [[other crtcs] (dissoc prefs person)
+             :let [sim (similarity prefs person other)]
+             :when (> sim 0)]
+         (for [[m r] crtcs
+                        :when (not (contains? (set (keys (prefs person))) m))]
+                    {m {:sim sim :rating (* sim r)}}))
+       (apply concat)))
 
+;(get-unseen-movies critics "Toby" sim-pearson)
+
+(defn get-recommendations
+  [prefs person similarity]
+  (let [x (reduce (fn [accum x]
+                    (let [k (apply key x)
+                          v (apply val x)]
+                      (if (empty? (accum k))
+                        (assoc accum k {:sim-sum (:sim v)
+                                        :ratings [(:rating v)]})
+                        (assoc accum k {:sim-sum (+ (:sim-sum (accum k))
+                                                    (:sim v))
+                                        :ratings (conj (:ratings (accum k))
+                                                       (:rating v))}))))
+                  {}
+                  (get-unseen-movies prefs person similarity))]
+    (into
+     {}
+     (for [[k v] x
+           :let [r (:ratings v)
+                 total (reduce + r)
+                 total-sim-sum (/ total (:sim-sum v))]]
+       [k total-sim-sum]))))
+
+
+(do
+  (time (get-recommendations critics "Toby" sim-pearson))
+  (time (get-recommendations critics "Toby" sim-pearson1)))
+
+
+;; (bench/with-progress-reporting(bench/bench (get-recommendations critics "Toby" sim-pearson)))
